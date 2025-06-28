@@ -2,111 +2,140 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Code Commenter</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-      background: #f4f4f4;
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #000000;
+      --input-bg: #f5f5f5;
+      --button-bg: #007bff;
+      --button-text: #ffffff;
     }
 
-    textarea, select, input[type=range], button {
+    body.dark {
+      --bg-color: #121212;
+      --text-color: #f5f5f5;
+      --input-bg: #1e1e1e;
+      --button-bg: #1a73e8;
+      --button-text: #ffffff;
+    }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 30px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    textarea, select, input[type="range"] {
       width: 100%;
       padding: 10px;
-      margin-top: 10px;
-      font-size: 16px;
+      background-color: var(--input-bg);
+      color: var(--text-color);
+      border: 1px solid #ccc;
+      margin-bottom: 15px;
     }
 
-    .result {
+    button {
+      background-color: var(--button-bg);
+      color: var(--button-text);
+      padding: 10px 20px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .toggle-container {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+
+    .explanation-box {
       white-space: pre-wrap;
-      background: #fff;
+      background-color: var(--input-bg);
+      border: 1px solid #ccc;
       padding: 15px;
       margin-top: 20px;
-      border: 1px solid #ccc;
-    }
-
-    .spinner {
-      display: none;
-      margin: 20px auto;
-      width: 40px;
-      height: 40px;
-      border: 5px solid #ccc;
-      border-top: 5px solid #333;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .button-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .button-row button {
-      flex: 1;
     }
   </style>
 </head>
 <body>
-  <h1>🧠 AI Code Commenter</h1>
-  <form method="POST" onsubmit="showSpinner()">
-    <label>Enter your code:</label>
-    <textarea name="code" rows="12" required>{{ request.form.code or '' }}</textarea>
+  <div class="toggle-container">
+    <label>
+      <input type="checkbox" id="darkToggle" /> 🌙 Dark Mode
+    </label>
+  </div>
 
-    <label>Comment Detail:</label>
+  <h1>AI Code Commenter</h1>
+
+  <form method="post">
+    <label>Paste your code below:</label>
+    <textarea name="code" rows="10" required>{{ request.form.code or '' }}</textarea>
+
+    <label>Comment detail level:</label>
     <select name="detail">
+      <option value="detailed" {% if request.form.detail == 'detailed' %}selected{% endif %}>Detailed</option>
       <option value="brief" {% if request.form.detail == 'brief' %}selected{% endif %}>Brief</option>
-      <option value="detailed" {% if request.form.detail != 'brief' %}selected{% endif %}>Detailed</option>
     </select>
 
-    <label>Model:</label>
+    <label>Select model:</label>
     <select name="model">
-      <option value="gpt-4o" {% if request.form.model == 'gpt-4o' %}selected{% endif %}>gpt-4o</option>
-      <option value="gpt-3.5-turbo" {% if request.form.model == 'gpt-3.5-turbo' %}selected{% endif %}>gpt-3.5-turbo</option>
+      <option value="gpt-4o" {% if request.form.model == 'gpt-4o' %}selected{% endif %}>GPT-4o</option>
+      <option value="gpt-3.5-turbo" {% if request.form.model == 'gpt-3.5-turbo' %}selected{% endif %}>GPT-3.5 Turbo</option>
     </select>
 
-    <label>Creativity (Temperature):</label>
-    <input type="range" name="temperature" min="0" max="1" step="0.1" value="{{ request.form.temperature or 0.3 }}"/>
+    <label>Creativity (temperature):</label>
+    <input type="range" name="temperature" min="0" max="1" step="0.1" value="{{ request.form.temperature or 0.3 }}">
 
-    <button type="submit">Generate Comments</button>
+    <button type="submit">🧠 Generate Comments</button>
   </form>
 
-  <div class="spinner" id="spinner"></div>
-
   {% if warning %}
-    <p style="color: red;">⚠️ {{ warning }}</p>
+    <p style="color: red;">{{ warning }}</p>
   {% endif %}
 
   {% if explanation %}
-    <div class="result" id="result">{{ explanation }}</div>
-    <div class="button-row">
-      <button onclick="copyText()">📋 Copy</button>
-      <button onclick="downloadText()">⬇️ Download</button>
+    <div class="explanation-box">
+      <h2>💬 Explanation</h2>
+      <pre id="explanation-text">{{ explanation }}</pre>
+      <button onclick="copyExplanation()">📋 Copy</button>
+      <button onclick="downloadExplanation()">⬇️ Download</button>
     </div>
   {% endif %}
 
   <script>
-    function copyText() {
-      const text = document.getElementById("result").innerText;
+    // Dark mode toggle logic
+    const darkToggle = document.getElementById("darkToggle");
+
+    darkToggle.addEventListener("change", function () {
+      document.body.classList.toggle("dark", darkToggle.checked);
+      localStorage.setItem("darkMode", darkToggle.checked ? "on" : "off");
+    });
+
+    // Load dark mode preference
+    window.onload = function () {
+      if (localStorage.getItem("darkMode") === "on") {
+        darkToggle.checked = true;
+        document.body.classList.add("dark");
+      }
+    };
+
+    function copyExplanation() {
+      const text = document.getElementById("explanation-text").innerText;
       navigator.clipboard.writeText(text).then(() => alert("Copied!"));
     }
 
-    function downloadText() {
-      const text = document.getElementById("result").innerText;
+    function downloadExplanation() {
+      const text = document.getElementById("explanation-text").innerText;
       const blob = new Blob([text], { type: "text/plain" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = "commented_code.txt";
+      link.download = "code_comments.txt";
       link.click();
-    }
-
-    function showSpinner() {
-      document.getElementById("spinner").style.display = "block";
     }
   </script>
 </body>
