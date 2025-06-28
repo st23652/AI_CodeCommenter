@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: AI-Code-Commenter
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    autoDeploy: true
+    envVars:
+      - key: OPENAI_API_KEY
+        fromSecret: OPENAI_API_KEY
